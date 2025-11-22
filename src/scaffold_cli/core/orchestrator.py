@@ -44,7 +44,7 @@ class ProjectOrchestrator:
             name = questionary.text(
                 "📦 Project name:",
                 validate=lambda text: len(
-                    text) > 0 or "Project name cannot be empty"
+                    text) > 0 or "Project name cannot be empty",
             ).ask()
 
             if name is None:  # User pressed Ctrl+C
@@ -55,10 +55,7 @@ class ProjectOrchestrator:
         if Path(name).exists():
             self.console.print(
                 f"[red]✗ Directory '{name}' already exists![/red]")
-            overwrite = questionary.confirm(
-                "Overwrite?",
-                default=False
-            ).ask()
+            overwrite = questionary.confirm("Overwrite?", default=False).ask()
 
             if not overwrite:
                 self.console.print("[yellow]Cancelled[/yellow]")
@@ -67,8 +64,7 @@ class ProjectOrchestrator:
         # Ask about monorepo
         if not monorepo:
             monorepo = questionary.confirm(
-                "🗂️  Create as monorepo?",
-                default=False
+                "🗂️  Create as monorepo?", default=False
             ).ask()
 
             if monorepo is None:  # User pressed Ctrl+C
@@ -90,11 +86,13 @@ class ProjectOrchestrator:
         category = questionary.select(
             "📂 Select project type:",
             choices=[cat.capitalize() for cat in categories],
-            style=questionary.Style([
-                ('selected', 'fg:cyan bold'),
-                ('pointer', 'fg:cyan bold'),
-                ('highlighted', 'fg:cyan'),
-            ])
+            style=questionary.Style(
+                [
+                    ("selected", "fg:cyan bold"),
+                    ("pointer", "fg:cyan bold"),
+                    ("highlighted", "fg:cyan"),
+                ]
+            ),
         ).ask()
 
         if category is None:  # User pressed Ctrl+C
@@ -110,11 +108,13 @@ class ProjectOrchestrator:
         selected_display_name = questionary.select(
             f"Select {category}:",
             choices=project_choices,
-            style=questionary.Style([
-                ('selected', 'fg:cyan bold'),
-                ('pointer', 'fg:cyan bold'),
-                ('highlighted', 'fg:cyan'),
-            ])
+            style=questionary.Style(
+                [
+                    ("selected", "fg:cyan bold"),
+                    ("pointer", "fg:cyan bold"),
+                    ("highlighted", "fg:cyan"),
+                ]
+            ),
         ).ask()
 
         if selected_display_name is None:  # User pressed Ctrl+C
@@ -156,11 +156,13 @@ class ProjectOrchestrator:
         selected_frontend = questionary.select(
             "🎨 Select frontend:",
             choices=frontend_choices,
-            style=questionary.Style([
-                ('selected', 'fg:cyan bold'),
-                ('pointer', 'fg:cyan bold'),
-                ('highlighted', 'fg:cyan'),
-            ])
+            style=questionary.Style(
+                [
+                    ("selected", "fg:cyan bold"),
+                    ("pointer", "fg:cyan bold"),
+                    ("highlighted", "fg:cyan"),
+                ]
+            ),
         ).ask()
 
         if selected_frontend is None:  # User pressed Ctrl+C
@@ -178,11 +180,13 @@ class ProjectOrchestrator:
         selected_api = questionary.select(
             "⚙️  Select backend API:",
             choices=api_choices,
-            style=questionary.Style([
-                ('selected', 'fg:cyan bold'),
-                ('pointer', 'fg:cyan bold'),
-                ('highlighted', 'fg:cyan'),
-            ])
+            style=questionary.Style(
+                [
+                    ("selected", "fg:cyan bold"),
+                    ("pointer", "fg:cyan bold"),
+                    ("highlighted", "fg:cyan"),
+                ]
+            ),
         ).ask()
 
         if selected_api is None:  # User pressed Ctrl+C
@@ -190,8 +194,7 @@ class ProjectOrchestrator:
             return False
 
         api_config = next(
-            p for p in api_projects if p.display_name == selected_api
-        )
+            p for p in api_projects if p.display_name == selected_api)
 
         # Validate all dependencies
         all_deps = list(set(frontend_config.requires + api_config.requires))
@@ -210,7 +213,8 @@ class ProjectOrchestrator:
         frontend_success = self.installer.install(
             frontend_config,
             "web",
-            parent_dir=project_root
+            parent_dir=project_root,
+            skip_post_install=True,
         )
 
         if not frontend_success:
@@ -222,7 +226,8 @@ class ProjectOrchestrator:
         api_success = self.installer.install(
             api_config,
             "api",
-            parent_dir=project_root
+            parent_dir=project_root,
+            skip_post_install=True,
         )
 
         if not api_success:
@@ -248,32 +253,36 @@ class ProjectOrchestrator:
         self.console.print(f"  cd {name}")
 
         # Project-specific instructions
-        if 'node' in config.requires:
-            if config.name == 'nextjs':
+        if "node" in config.requires:
+            if config.name == "nextjs":
                 self.console.print(f"  npm run dev")
             else:
                 self.console.print(f"  npm install  # if not already done")
                 self.console.print(f"  npm run dev")
-        elif 'python3' in config.requires:
-            if config.name == 'django':
+        elif "python3" in config.requires:
+            if config.name == "django":
                 self.console.print(f"  python3 -m venv venv")
                 self.console.print(f"  source venv/bin/activate")
                 self.console.print(f"  python manage.py migrate")
                 self.console.print(f"  python manage.py runserver")
-            elif config.name == 'fastapi':
+            elif config.name == "fastapi":
                 self.console.print(f"  python3 -m venv venv")
                 self.console.print(f"  source venv/bin/activate")
                 self.console.print(f"  pip install -r requirements.txt")
                 self.console.print(f"  uvicorn main:app --reload")
 
         self.console.print(
-            f"\n[dim]Need help? Run:[/dim] [cyan]scaffold --help[/cyan]\n")
+            f"\n[dim]Need help? Run:[/dim] [cyan]scaffold --help[/cyan]\n"
+        )
 
-    def _show_monorepo_success(self, name: str, frontend: ProjectConfig, api: ProjectConfig):
+    def _show_monorepo_success(
+        self, name: str, frontend: ProjectConfig, api: ProjectConfig
+    ):
         """Display success message for monorepo"""
         self.console.print("\n" + "=" * 60)
         self.console.print(
-            f"[bold green]✨ Success![/bold green] Created monorepo: {name}")
+            f"[bold green]✨ Success![/bold green] Created monorepo: {name}"
+        )
         self.console.print("=" * 60)
 
         self.console.print(f"\n[bold]Structure:[/bold]")
@@ -291,7 +300,9 @@ class ProjectOrchestrator:
         self.console.print(
             f"\n[dim]See README.md for detailed instructions[/dim]\n")
 
-    def _create_monorepo_readme(self, project_root: Path, frontend: ProjectConfig, api: ProjectConfig):
+    def _create_monorepo_readme(
+        self, project_root: Path, frontend: ProjectConfig, api: ProjectConfig
+    ):
         """Create README for monorepo"""
         readme_content = f"""# {project_root.name}
 
@@ -349,3 +360,5 @@ You can add npm scripts to the root `package.json` to manage both services:
 
         readme_path = project_root / "README.md"
         readme_path.write_text(readme_content)
+
+        self.console.print(f"Created {readme_path}")

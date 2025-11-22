@@ -12,9 +12,9 @@ class ProjectConfig:
 
     name: str
     display_name: str
-    category: str
+    category: str  # 'frontend', 'api', 'framework'
     command: str
-    requires: List[str]
+    requires: List[str]  # Required dependencies
     interactive: bool = True  # Use tool's native prompts?
     post_install: Optional[List[str]] = None  # Commands to run after creation
 
@@ -30,10 +30,10 @@ PROJECTS = {
             name="react-vite",
             display_name="React (Vite)",
             category="frontend",
-            command="npm create vite@latest {name} -- --template react",
+            command="npm create vite@latest {name}",
             requires=["node", "npm"],
             interactive=True,
-            post_install=["npm install"],
+            post_install=[],  # Don't auto-install, let user do it
         ),
         ProjectConfig(
             name="react-vite-ts",
@@ -41,8 +41,8 @@ PROJECTS = {
             category="frontend",
             command="npm create vite@latest {name} -- --template react-ts",
             requires=["node", "npm"],
-            interactive=False,  # We specify the template
-            post_install=["npm install"],
+            interactive=True,
+            post_install=[],
         ),
         ProjectConfig(
             name="nextjs",
@@ -50,8 +50,8 @@ PROJECTS = {
             category="frontend",
             command="npx create-next-app@latest {name}",
             requires=["node", "npm"],
-            # Next.js will ask about TypeScript, Tailwind, etc.
             interactive=True,
+            post_install=[],
         ),
         ProjectConfig(
             name="vue-vite",
@@ -60,7 +60,7 @@ PROJECTS = {
             command="npm create vite@latest {name} -- --template vue",
             requires=["node", "npm"],
             interactive=True,
-            post_install=["npm install"],
+            post_install=[],
         ),
     ],
     "api": [

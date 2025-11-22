@@ -1,3 +1,7 @@
+"""
+Command execution utilities
+"""
+
 import subprocess
 import sys
 from pathlib import Path
@@ -19,7 +23,7 @@ class CommandRunner:
         command: str,
         cwd: Optional[Path] = None,
         description: str = "Running command",
-        show_output: bool = False
+        show_output: bool = False,
     ) -> bool:
         """
         Run a shell command with progress indication
@@ -39,40 +43,30 @@ class CommandRunner:
             return self._run_with_spinner(command, cwd, description)
 
     def _run_interactive(
-        self,
-        command: str,
-        cwd: Optional[Path],
-        description: str
+        self, command: str, cwd: Optional[Path], description: str
     ) -> bool:
-        """Run command and show output in real-time"""
+        """Run command and show output in real-time with proper TTY"""
         console.print(f"\n[cyan]→ {description}...[/cyan]")
         console.print(f"[dim]$ {command}[/dim]\n")
 
         try:
-            # Run with live output
-            process = subprocess.Popen(
+            # Run with shell and inherit stdin/stdout/stderr for full interactivity
+            process = subprocess.run(
                 command,
                 shell=True,
                 cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
+                stdin=sys.stdin,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
             )
 
-            # Stream output
-            for line in process.stdout:
-                console.print(line, end='', highlight=False)
-
-            process.wait()
-
             if process.returncode == 0:
-                console.print(f"[green]✓ {description} completed[/green]")
+                console.print(f"\n[green]✓ {description} completed[/green]")
                 return True
             else:
                 console.print(
-                    f"[red]✗ {description} failed (exit code: {process.returncode})[/red]")
+                    f"\n[red]✗ {description} failed (exit code: {process.returncode})[/red]"
+                )
                 return False
 
         except Exception as e:
@@ -80,17 +74,14 @@ class CommandRunner:
             return False
 
     def _run_with_spinner(
-        self,
-        command: str,
-        cwd: Optional[Path],
-        description: str
+        self, command: str, cwd: Optional[Path], description: str
     ) -> bool:
         """Run command with a spinner (hides output)"""
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
-            transient=True
+            transient=True,
         ) as progress:
             task = progress.add_task(description, total=None)
 
@@ -101,7 +92,7 @@ class CommandRunner:
                     cwd=cwd,
                     capture_output=True,
                     text=True,
-                    timeout=600  # 10 minute timeout
+                    timeout=300,  # 5 minute timeout
                 )
 
                 if result.returncode == 0:
@@ -125,7 +116,7 @@ class CommandRunner:
         commands: List[str],
         cwd: Optional[Path] = None,
         descriptions: Optional[List[str]] = None,
-        show_output: bool = False
+        show_output: bool = False,
     ) -> bool:
         """
         Run multiple commands in sequence

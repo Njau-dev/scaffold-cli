@@ -1,3 +1,7 @@
+"""
+Dependency validation - checks if required tools are installed
+"""
+
 import shutil
 import subprocess
 import re
@@ -13,42 +17,42 @@ class DependencyValidator:
 
     # Tool configurations
     TOOLS = {
-        'node': {
-            'check': 'node --version',
-            'install_hint': 'https://nodejs.org/',
-            'min_version': '18.0.0',
-            'description': 'Node.js runtime'
+        "node": {
+            "check": "node --version",
+            "install_hint": "https://nodejs.org/",
+            "min_version": "18.0.0",
+            "description": "Node.js runtime",
         },
-        'npm': {
-            'check': 'npm --version',
-            'install_hint': 'https://nodejs.org/ (comes with Node.js)',
-            'min_version': '9.0.0',
-            'description': 'Node package manager'
+        "npm": {
+            "check": "npm --version",
+            "install_hint": "https://nodejs.org/ (comes with Node.js)",
+            "min_version": "9.0.0",
+            "description": "Node package manager",
         },
-        'python3': {
-            'check': 'python3 --version',
-            'install_hint': 'https://python.org/',
-            'min_version': '3.10.0',
-            'description': 'Python 3 runtime'
+        "python3": {
+            "check": "python3 --version",
+            "install_hint": "https://python.org/",
+            "min_version": "3.10.0",
+            "description": "Python 3 runtime",
         },
-        'pip': {
-            'check': 'pip --version',
-            'install_hint': 'python3 -m ensurepip',
-            'min_version': '20.0.0',
-            'description': 'Python package manager'
+        "pip": {
+            "check": "pip --version",
+            "install_hint": "python3 -m ensurepip",
+            "min_version": "20.0.0",
+            "description": "Python package manager",
         },
-        'django-admin': {
-            'check': 'django-admin --version',
-            'install_hint': 'pip install django',
-            'min_version': None,
-            'description': 'Django CLI'
+        "django-admin": {
+            "check": "django-admin --version",
+            "install_hint": "pip install django",
+            "min_version": None,
+            "description": "Django CLI",
         },
-        'composer': {
-            'check': 'composer --version',
-            'install_hint': 'https://getcomposer.org/',
-            'min_version': None,
-            'description': 'PHP dependency manager'
-        }
+        "composer": {
+            "check": "composer --version",
+            "install_hint": "https://getcomposer.org/",
+            "min_version": None,
+            "description": "PHP dependency manager",
+        },
     }
 
     def validate(self, required: List[str]) -> Tuple[bool, Dict[str, Dict]]:
@@ -71,9 +75,9 @@ class DependencyValidator:
 
             is_available, version = self._check_tool(tool)
             results[tool] = {
-                'available': is_available,
-                'version': version,
-                'config': self.TOOLS[tool]
+                "available": is_available,
+                "version": version,
+                "config": self.TOOLS[tool],
             }
 
             if not is_available:
@@ -90,12 +94,9 @@ class DependencyValidator:
 
         # Get version
         try:
-            check_cmd = self.TOOLS[tool]['check']
+            check_cmd = self.TOOLS[tool]["check"]
             result = subprocess.run(
-                check_cmd.split(),
-                capture_output=True,
-                text=True,
-                timeout=5
+                check_cmd.split(), capture_output=True, text=True, timeout=5
             )
 
             if result.returncode != 0:
@@ -113,9 +114,9 @@ class DependencyValidator:
         """Extract version number from command output"""
         # Common version patterns
         patterns = [
-            r'v?(\d+\.\d+\.\d+)',  # 1.2.3 or v1.2.3
-            r'version\s+(\d+\.\d+\.\d+)',  # version 1.2.3
-            r'(\d+\.\d+)',  # 1.2
+            r"v?(\d+\.\d+\.\d+)",  # 1.2.3 or v1.2.3
+            r"version\s+(\d+\.\d+\.\d+)",  # version 1.2.3
+            r"(\d+\.\d+)",  # 1.2
         ]
 
         for pattern in patterns:
@@ -123,39 +124,36 @@ class DependencyValidator:
             if match:
                 return match.group(1)
 
-        return 'unknown'
+        return "unknown"
 
-    def display_results(self, results: Dict[str, Dict], show_all: bool = False):
+    def display_results(self, results: Dict[str, Dict], show_all: bool = True):
         """Display validation results in a nice table"""
-        table = Table(title="Dependency Check")
-        table.add_column("Tool", style="cyan")
-        table.add_column("Status", style="white")
+        if not results:
+            return
+
+        table = Table(title="Dependency Check", show_header=True, header_style="bold")
+        table.add_column("Tool", style="cyan", no_wrap=True)
+        table.add_column("Status", style="white", no_wrap=True)
         table.add_column("Version", style="dim")
         table.add_column("Description", style="dim")
 
         for tool, info in results.items():
-            if info['available']:
+            if info["available"]:
                 status = "[green]✓ Installed[/green]"
-                version = info['version']
+                version = info["version"]
             else:
                 status = "[red]✗ Missing[/red]"
                 version = "-"
 
-            if show_all or not info['available']:
-                table.add_row(
-                    tool,
-                    status,
-                    version,
-                    info['config']['description']
-                )
+            # Always show all results during validation
+            table.add_row(tool, status, version, info["config"]["description"])
 
         console.print(table)
 
     def show_installation_hints(self, results: Dict[str, Dict]):
         """Show how to install missing dependencies"""
         missing = [
-            (tool, info) for tool, info in results.items()
-            if not info['available']
+            (tool, info) for tool, info in results.items() if not info["available"]
         ]
 
         if not missing:
@@ -163,10 +161,8 @@ class DependencyValidator:
 
         console.print("\n[bold red]Missing Dependencies:[/bold red]")
         for tool, info in missing:
-            console.print(
-                f"\n[bold]{tool}[/bold] - {info['config']['description']}")
-            console.print(
-                f"  Install: [blue]{info['config']['install_hint']}[/blue]")
+            console.print(f"\n[bold]{tool}[/bold] - {info['config']['description']}")
+            console.print(f"  Install: [blue]{info['config']['install_hint']}[/blue]")
 
     def validate_and_report(self, required: List[str]) -> bool:
         """Validate dependencies and show detailed report"""
@@ -183,5 +179,6 @@ class DependencyValidator:
         else:
             self.show_installation_hints(results)
             console.print(
-                "\n[red]✗ Please install missing dependencies and try again[/red]")
+                "\n[red]✗ Please install missing dependencies and try again[/red]"
+            )
             return False

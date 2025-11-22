@@ -1,10 +1,14 @@
+"""
+Project installation logic
+"""
+
 import subprocess
 from pathlib import Path
 from typing import Optional
 from rich.console import Console
 
 from .project_types import ProjectConfig
-from scaffold_cli.utils.command_runner import CommandRunner
+from ..utils.command_runner import CommandRunner
 
 console = Console()
 
@@ -20,7 +24,8 @@ class Installer:
         self,
         config: ProjectConfig,
         project_name: str,
-        parent_dir: Optional[Path] = None
+        parent_dir: Optional[Path] = None,
+        skip_post_install: bool = False,
     ) -> bool:
         """
         Install a project based on its configuration
@@ -29,6 +34,7 @@ class Installer:
             config: Project configuration
             project_name: Name of the project to create
             parent_dir: Parent directory (defaults to current directory)
+            skip_post_install: Skip post-installation steps
 
         Returns:
             True if installation succeeded
@@ -39,12 +45,13 @@ class Installer:
         project_path = parent_dir / project_name
 
         # Handle custom installers
-        if config.command.startswith('custom:'):
+        if config.command.startswith("custom:"):
             return self._handle_custom_install(config, project_path)
 
         # Run the main installation command
         console.print(
-            f"\n[bold cyan]📦 Creating {config.display_name} project...[/bold cyan]")
+            f"\n[bold cyan]📦 Creating {config.display_name} project...[/bold cyan]"
+        )
 
         # Format the command with project name
         command = config.command.format(name=project_name)
@@ -54,15 +61,15 @@ class Installer:
             command=command,
             cwd=parent_dir,
             description=f"Installing {config.display_name}",
-            show_output=config.interactive
+            show_output=config.interactive,
         )
 
         if not success:
             console.print(f"[red]✗ Failed to create project[/red]")
             return False
 
-        # Run post-install commands
-        if config.post_install:
+        # Run post-install commands (unless skipped)
+        if config.post_install and not skip_post_install:
             return self._run_post_install(config, project_path)
 
         return True
@@ -77,12 +84,11 @@ class Installer:
                 command=cmd,
                 cwd=project_path,
                 description=f"Running: {cmd}",
-                show_output=False
+                show_output=False,
             )
 
             if not success:
-                console.print(
-                    f"[yellow]⚠ Post-install step failed: {cmd}[/yellow]")
+                console.print(f"[yellow]⚠ Post-install step failed: {cmd}[/yellow]")
                 console.print("[dim]You may need to run this manually[/dim]")
                 # Don't fail the whole installation for post-install failures
 
@@ -90,9 +96,9 @@ class Installer:
 
     def _handle_custom_install(self, config: ProjectConfig, project_path: Path) -> bool:
         """Handle custom installation types"""
-        custom_type = config.command.split(':')[1]
+        custom_type = config.command.split(":")[1]
 
-        if custom_type == 'fastapi':
+        if custom_type == "fastapi":
             return self._create_fastapi_project(project_path)
 
         console.print(f"[red]Unknown custom installer: {custom_type}[/red]")
@@ -100,8 +106,7 @@ class Installer:
 
     def _create_fastapi_project(self, project_path: Path) -> bool:
         """Create a minimal FastAPI project"""
-        console.print(
-            f"\n[bold cyan]📦 Creating FastAPI project...[/bold cyan]")
+        console.print(f"\n[bold cyan]📦 Creating FastAPI project...[/bold cyan]")
 
         try:
             # Create project structure
@@ -109,7 +114,8 @@ class Installer:
 
             # Create main.py
             main_py = project_path / "main.py"
-            main_py.write_text('''"""
+            main_py.write_text(
+                '''"""
 FastAPI application
 """
 from fastapi import FastAPI
@@ -127,18 +133,22 @@ async def root():
 async def health():
     """Health check endpoint"""
     return {"status": "healthy"}
-''')
+'''
+            )
 
             # Create requirements.txt
             requirements = project_path / "requirements.txt"
-            requirements.write_text('''fastapi==0.104.1
+            requirements.write_text(
+                """fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
-''')
+"""
+            )
 
             # Create README.md
             readme = project_path / "README.md"
-            readme.write_text(f'''# {project_path.name}
+            readme.write_text(
+                f"""# {project_path.name}
 
 FastAPI project created with Scaffold CLI.
 
@@ -166,11 +176,13 @@ API Docs: http://127.0.0.1:8000/docs
 
 - `GET /` - Root endpoint
 - `GET /health` - Health check
-''')
+"""
+            )
 
             # Create .gitignore
             gitignore = project_path / ".gitignore"
-            gitignore.write_text('''__pycache__/
+            gitignore.write_text(
+                """__pycache__/
 *.py[cod]
 *$py.class
 venv/
@@ -179,10 +191,10 @@ venv/
 .pytest_cache/
 .coverage
 *.log
-''')
+"""
+            )
 
-            console.print(
-                f"[green]✓ FastAPI project created successfully[/green]")
+            console.print(f"[green]✓ FastAPI project created successfully[/green]")
             return True
 
         except Exception as e:
