@@ -15,6 +15,7 @@ from .project_types import (
 )
 from .installer import Installer
 from ..validators.dependencies import DependencyValidator
+from ..utils.git import GitManager
 
 console = Console()
 
@@ -26,6 +27,7 @@ class ProjectOrchestrator:
         self.console = console
         self.validator = DependencyValidator()
         self.installer = Installer()
+        self.git_manager = GitManager()
 
     def create_project(self, name: Optional[str] = None, monorepo: bool = False):
         """Main entry point for project creation"""
@@ -43,8 +45,7 @@ class ProjectOrchestrator:
         if not name:
             name = questionary.text(
                 "📦 Project name:",
-                validate=lambda text: len(
-                    text) > 0 or "Project name cannot be empty",
+                validate=lambda text: len(text) > 0 or "Project name cannot be empty",
             ).ask()
 
             if name is None:  # User pressed Ctrl+C
@@ -53,8 +54,7 @@ class ProjectOrchestrator:
 
         # Check if directory already exists
         if Path(name).exists():
-            self.console.print(
-                f"[red]✗ Directory '{name}' already exists![/red]")
+            self.console.print(f"[red]✗ Directory '{name}' already exists![/red]")
             overwrite = questionary.confirm("Overwrite?", default=False).ask()
 
             if not overwrite:
@@ -136,7 +136,13 @@ class ProjectOrchestrator:
         if not success:
             return False
 
-        # Step 5: Show success message
+        # Step 5: Initialize git
+        project_path = Path.cwd() / name
+        self.git_manager.init_repository(
+            project_path, f"Initial commit - {project_config.display_name} project"
+        )
+
+        # Step 6: Show success message
         self._show_success_message(name, project_config)
 
         return True
@@ -145,13 +151,11 @@ class ProjectOrchestrator:
         """Create a monorepo project"""
 
         self.console.print("\n[bold cyan]→ Monorepo Setup[/bold cyan]")
-        self.console.print(
-            "[dim]Select frontend and backend technologies[/dim]")
+        self.console.print("[dim]Select frontend and backend technologies[/dim]")
 
         # Choose frontend with arrow keys
         frontend_projects = get_projects_by_category("frontend")
-        frontend_choices = [
-            project.display_name for project in frontend_projects]
+        frontend_choices = [project.display_name for project in frontend_projects]
 
         selected_frontend = questionary.select(
             "🎨 Select frontend:",
@@ -193,8 +197,7 @@ class ProjectOrchestrator:
             self.console.print("\n[yellow]Cancelled[/yellow]")
             return False
 
-        api_config = next(
-            p for p in api_projects if p.display_name == selected_api)
+        api_config = next(p for p in api_projects if p.display_name == selected_api)
 
         # Validate all dependencies
         all_deps = list(set(frontend_config.requires + api_config.requires))
@@ -202,8 +205,7 @@ class ProjectOrchestrator:
             return False
 
         # Create monorepo structure
-        self.console.print(
-            f"\n[bold yellow]📦 Creating monorepo: {name}[/bold yellow]")
+        self.console.print(f"\n[bold yellow]📦 Creating monorepo: {name}[/bold yellow]")
 
         project_root = Path.cwd() / name
         project_root.mkdir(parents=True, exist_ok=True)
@@ -214,7 +216,7 @@ class ProjectOrchestrator:
             frontend_config,
             "web",
             parent_dir=project_root,
-            skip_post_install=True,
+            skip_post_install=True,  # Skip npm install in monorepo
         )
 
         if not frontend_success:
@@ -227,7 +229,7 @@ class ProjectOrchestrator:
             api_config,
             "api",
             parent_dir=project_root,
-            skip_post_install=True,
+            skip_post_install=True,  # Skip post-install in monorepo
         )
 
         if not api_success:
@@ -237,6 +239,11 @@ class ProjectOrchestrator:
         # Create root README
         self._create_monorepo_readme(project_root, frontend_config, api_config)
 
+        # Initialize git for the monorepo
+        self.git_manager.init_repository(
+            project_root, "Initial commit - Monorepo with frontend and backend"
+        )
+
         # Show success
         self._show_monorepo_success(name, frontend_config, api_config)
 
@@ -244,36 +251,119 @@ class ProjectOrchestrator:
 
     def _show_success_message(self, name: str, config: ProjectConfig):
         """Display success message for single project"""
-        self.console.print("\n" + "=" * 60)
-        self.console.print(
-            f"[bold green]✨ Success![/bold green] Created {name}")
-        self.console.print("=" * 60)
+        from rich.panel import Panel
 
-        self.console.print(f"\n[bold]Next steps:[/bold]")
-        self.console.print(f"  cd {name}")
+        self.console.print("\n" + "=" * 70)
+        self.console.print(
+            f"[bold green]✨ Success![/bold green] Project created: [cyan]{name}[/cyan]"
+        )
+        self.console.print("=" * 70)
+
+        self.console.print(f"\n[bold]📁 Project Structure:[/bold]")
+        self.console.print(f"  {name}/")
+        if "node" in config.requires:
+            self.console.print("  ├── package.json")
+            self.console.print("  ├── src/")
+            self.console.print("  └── ...")
+        elif "python3" in config.requires:
+            if config.name == "django":
+                self.console.print("  ├── manage.py")
+                self.console.print("  ├── {name}/")
+                self.console.print("  └── ...")
+            else:
+                self.console.print("  ├── main.py")
+                self.console.print("  ├── requirements.txt")
+                self.console.print("  └── ...")
+
+        # Next steps
+        self.console.print(f"\n[bold]🚀 Next Steps:[/bold]")
+        self.console.print(f"\n  [bold cyan]1. Navigate to your project:[/bold cyan]")
+        self.console.print(f"     cd {name}")
 
         # Project-specific instructions
         if "node" in config.requires:
+            self.console.print(f"\n  [bold cyan]2. Install dependencies:[/bold cyan]")
+            self.console.print(f"     npm install")
+            self.console.print(
+                f"\n  [bold cyan]3. Start development server:[/bold cyan]"
+            )
+            self.console.print(f"     npm run dev")
+
             if config.name == "nextjs":
-                self.console.print(f"  npm run dev")
+                self.console.print(
+                    f"\n  [dim]→ Your Next.js app will be at: http://localhost:3000[/dim]"
+                )
             else:
-                self.console.print(f"  npm install  # if not already done")
-                self.console.print(f"  npm run dev")
+                self.console.print(
+                    f"\n  [dim]→ Your app will be at: http://localhost:5173[/dim]"
+                )
+
         elif "python3" in config.requires:
+            self.console.print(
+                f"\n  [bold cyan]2. Set up virtual environment:[/bold cyan]"
+            )
+            self.console.print(f"     python3 -m venv venv")
+            self.console.print(
+                f"     source venv/bin/activate  [dim]# On Windows: venv\\Scripts\\activate[/dim]"
+            )
+
             if config.name == "django":
-                self.console.print(f"  python3 -m venv venv")
-                self.console.print(f"  source venv/bin/activate")
-                self.console.print(f"  python manage.py migrate")
-                self.console.print(f"  python manage.py runserver")
+                self.console.print(
+                    f"\n  [bold cyan]3. Install dependencies & migrate:[/bold cyan]"
+                )
+                self.console.print(f"     pip install django")
+                self.console.print(f"     python manage.py migrate")
+                self.console.print(
+                    f"\n  [bold cyan]4. Start development server:[/bold cyan]"
+                )
+                self.console.print(f"     python manage.py runserver")
+                self.console.print(
+                    f"\n  [dim]→ Your Django app will be at: http://127.0.0.1:8000[/dim]"
+                )
             elif config.name == "fastapi":
-                self.console.print(f"  python3 -m venv venv")
-                self.console.print(f"  source venv/bin/activate")
-                self.console.print(f"  pip install -r requirements.txt")
-                self.console.print(f"  uvicorn main:app --reload")
+                self.console.print(
+                    f"\n  [bold cyan]3. Install dependencies:[/bold cyan]"
+                )
+                self.console.print(f"     pip install -r requirements.txt")
+                self.console.print(
+                    f"\n  [bold cyan]4. Start development server:[/bold cyan]"
+                )
+                self.console.print(f"     uvicorn main:app --reload")
+                self.console.print(
+                    f"\n  [dim]→ Your API will be at: http://127.0.0.1:8000[/dim]"
+                )
+                self.console.print(
+                    f"  [dim]→ API docs at: http://127.0.0.1:8000/docs[/dim]"
+                )
+
+        # Git instructions
+        self.console.print(f"\n[bold]🔧 Git Repository:[/bold]")
+        self.console.print(
+            f"  [green]✓[/green] Repository initialized with first commit"
+        )
+        self.console.print(f"  [green]✓[/green] Default branch set to 'main'")
 
         self.console.print(
-            f"\n[dim]Need help? Run:[/dim] [cyan]scaffold --help[/cyan]\n"
+            f"\n  [bold cyan]To push to a remote repository:[/bold cyan]"
         )
+        self.console.print(f"     git remote add origin <repository-url>")
+        self.console.print(f"     git push -u origin main")
+
+        self.console.print(f"\n  [dim]Example with GitHub:[/dim]")
+        self.console.print(
+            f"     [dim]git remote add origin git@github.com:username/{name}.git[/dim]"
+        )
+        self.console.print(f"     [dim]git push -u origin main[/dim]")
+
+        # Footer
+        self.console.print(f"\n[bold]📚 Resources:[/bold]")
+        self.console.print(
+            f"  [cyan]scaffold --help[/cyan]           Show all commands"
+        )
+        self.console.print(
+            f"  [cyan]scaffold list[/cyan]             View available templates"
+        )
+        self.console.print(f"\n[dim]Happy coding! 🎉[/dim]\n")
 
     def _show_monorepo_success(
         self, name: str, frontend: ProjectConfig, api: ProjectConfig
@@ -288,17 +378,36 @@ class ProjectOrchestrator:
         self.console.print(f"\n[bold]Structure:[/bold]")
         self.console.print(f"  {name}/")
         self.console.print(f"  ├── web/     ({frontend.display_name})")
-        self.console.print(f"  └── api/     ({api.display_name})")
+        self.console.print(f"  ├── api/     ({api.display_name})")
+        self.console.print(f"  └── README.md")
 
         self.console.print(f"\n[bold]Next steps:[/bold]")
         self.console.print(f"  cd {name}")
-        self.console.print(f"\n  # Start frontend")
-        self.console.print(f"  cd web && npm run dev")
-        self.console.print(f"\n  # Start backend (in another terminal)")
-        self.console.print(f"  cd api && <run backend commands>")
 
         self.console.print(
-            f"\n[dim]See README.md for detailed instructions[/dim]\n")
+            f"\n  [bold cyan]# Install frontend dependencies[/bold cyan]"
+        )
+        self.console.print(f"  cd web && npm install")
+
+        self.console.print(f"\n  [bold cyan]# Start frontend dev server[/bold cyan]")
+        self.console.print(f"  npm run dev")
+
+        self.console.print(
+            f"\n  [bold cyan]# Setup backend (in another terminal)[/bold cyan]"
+        )
+        self.console.print(f"  cd ../api")
+        if "python3" in api.requires:
+            self.console.print(f"  python3 -m venv venv")
+            self.console.print(f"  source venv/bin/activate")
+            self.console.print(f"  pip install -r requirements.txt")
+        elif "node" in api.requires:
+            self.console.print(f"  npm install")
+
+        self.console.print(f"\n[bold]Git:[/bold]")
+        self.console.print(f"  ✓ Repository initialized")
+        self.console.print(f"  ✓ Initial commit created")
+
+        self.console.print(f"\n[dim]See README.md for detailed instructions[/dim]\n")
 
     def _create_monorepo_readme(
         self, project_root: Path, frontend: ProjectConfig, api: ProjectConfig
@@ -360,5 +469,3 @@ You can add npm scripts to the root `package.json` to manage both services:
 
         readme_path = project_root / "README.md"
         readme_path.write_text(readme_content)
-
-        self.console.print(f"Created {readme_path}")
