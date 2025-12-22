@@ -53,6 +53,12 @@ class DependencyValidator:
             "min_version": None,
             "description": "PHP dependency manager",
         },
+        "git": {
+            "check": "git --version",
+            "install_hint": "https://git-scm.com/",
+            "min_version": None,
+            "description": "Git version control",
+        }
     }
 
     def validate(self, required: List[str]) -> Tuple[bool, Dict[str, Dict]]:

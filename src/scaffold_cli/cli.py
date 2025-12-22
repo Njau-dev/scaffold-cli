@@ -6,6 +6,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from typing import Optional
+from rich.panel import Panel
+import sys
+import platform
 
 from .core.orchestrator import ProjectOrchestrator
 from .core.project_types import PROJECTS
@@ -63,7 +66,6 @@ def new(
 @app.command()
 def info():
     """Show detailed CLI information"""
-    from rich.panel import Panel
 
     # Header
     console.print()
@@ -130,7 +132,6 @@ def info():
 @app.command()
 def list():
     """List all available project templates"""
-    from rich.panel import Panel
 
     console.print()
     console.print(
@@ -174,9 +175,6 @@ def list():
 @app.command()
 def version():
     """Show version and system information"""
-    import sys
-    import platform
-    from rich.panel import Panel
 
     # Version info
     version_info = f"[bold cyan]Scaffold CLI[/bold cyan] [white]v{__version__}[/white]"
@@ -209,6 +207,11 @@ Architecture: {platform.machine()}[/dim]"""
 
     console.print()
 
+
+@app.command()
+def test():
+    """Test command"""
+    console.print("Test command")
 
 @app.callback()
 def main():

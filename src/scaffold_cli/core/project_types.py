@@ -12,11 +12,11 @@ class ProjectConfig:
 
     name: str
     display_name: str
-    category: str  # 'frontend', 'api', 'framework'
+    category: str
     command: str
-    requires: List[str]  # Required dependencies
-    interactive: bool = True  # Use tool's native prompts?
-    post_install: Optional[List[str]] = None  # Commands to run after creation
+    requires: List[str]
+    interactive: bool = True
+    post_install: Optional[List[str]] = None
 
     def __post_init__(self):
         if self.post_install is None:
@@ -77,7 +77,7 @@ PROJECTS = {
             name="fastapi",
             display_name="FastAPI",
             category="api",
-            command="custom:fastapi",  # Custom handler for minimal setup
+            command="custom:fastapi",
             requires=["python3"],
             interactive=False,
         ),

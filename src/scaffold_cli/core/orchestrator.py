@@ -341,19 +341,20 @@ class ProjectOrchestrator:
         self.console.print(
             f"  [green]✓[/green] Repository initialized with first commit"
         )
-        self.console.print(f"  [green]✓[/green] Default branch set to 'main'")
+        self.console.print(
+            f"  [green]✓[/green] Default branch set to 'master'")
 
         self.console.print(
             f"\n  [bold cyan]To push to a remote repository:[/bold cyan]"
         )
         self.console.print(f"     git remote add origin <repository-url>")
-        self.console.print(f"     git push -u origin main")
+        self.console.print(f"     git push -u origin master")
 
         self.console.print(f"\n  [dim]Example with GitHub:[/dim]")
         self.console.print(
             f"     [dim]git remote add origin git@github.com:username/{name}.git[/dim]"
         )
-        self.console.print(f"     [dim]git push -u origin main[/dim]")
+        self.console.print(f"     [dim]git push -u origin master[/dim]")
 
         # Footer
         self.console.print(f"\n[bold]📚 Resources:[/bold]")
