@@ -1,6 +1,7 @@
 """
 Scaffold init command - initialize existing projects
 """
+
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
@@ -31,20 +32,23 @@ class InitCommand:
         """Main initialization workflow"""
         # Welcome
         console.print()
-        console.print(Panel.fit(
-            "[bold cyan]🔍 Scaffold Init[/bold cyan]\n"
-            "[dim]Analyze and set up your development environment[/dim]",
-            border_style="cyan"
-        ))
+        console.print(
+            Panel.fit(
+                "[bold cyan]🔍 Scaffold Init[/bold cyan]\n"
+                "[dim]Analyze and set up your development environment[/dim]",
+                border_style="cyan",
+            )
+        )
 
         # Step 1: Detect project
         console.print("\n[yellow]→ Analyzing project...[/yellow]")
         project = self.detector.detect()
 
-        if project.type == 'unknown':
+        if project.type == "unknown":
             console.print("[red]✗ Could not detect project type[/red]")
             console.print(
-                "[dim]This directory doesn't appear to be a recognized project[/dim]")
+                "[dim]This directory doesn't appear to be a recognized project[/dim]"
+            )
             return False
 
         # Show detection results
@@ -57,34 +61,27 @@ class InitCommand:
         # Step 3: Install project dependencies
         if not project.dependencies_installed:
             if questionary.confirm(
-                "\n📦 Install project dependencies?",
-                default=True
+                "\n📦 Install project dependencies?", default=True
             ).ask():
                 self._install_dependencies(project)
 
         # Step 4: Initialize git if needed
         if not project.has_git:
             if questionary.confirm(
-                "\n🔧 Initialize git repository?",
-                default=True
+                "\n🔧 Initialize git repository?", default=True
             ).ask():
                 self.git_manager.init_repository(
-                    self.project_path,
-                    f"Initial commit - {project.type} project"
+                    self.project_path, f"Initial commit - {project.type} project"
                 )
 
         # Step 5: Environment setup
         if questionary.confirm(
-            "\n🔧 Set up environment configuration?",
-            default=True
+            "\n🔧 Set up environment configuration?", default=True
         ).ask():
             self._setup_environment(project)
 
         # Step 6: Docker setup
-        if questionary.confirm(
-            "\n🐳 Set up Docker?",
-            default=True
-        ).ask():
+        if questionary.confirm("\n🐳 Set up Docker?", default=True).ask():
             self._setup_docker(project)
 
         # Step 7: Show summary
@@ -113,19 +110,35 @@ class InitCommand:
         table.add_row("", "")  # Spacer
         table.add_row(
             "Git",
-            "[green]✓ Initialized[/green]" if project.has_git else "[yellow]✗ Not initialized[/yellow]"
+            (
+                "[green]✓ Initialized[/green]"
+                if project.has_git
+                else "[yellow]✗ Not initialized[/yellow]"
+            ),
         )
         table.add_row(
             "Dependencies",
-            "[green]✓ Installed[/green]" if project.dependencies_installed else "[yellow]✗ Not installed[/yellow]"
+            (
+                "[green]✓ Installed[/green]"
+                if project.dependencies_installed
+                else "[yellow]✗ Not installed[/yellow]"
+            ),
         )
         table.add_row(
             "Environment",
-            "[green]✓ Configured[/green]" if project.has_env else "[yellow]✗ Not configured[/yellow]"
+            (
+                "[green]✓ Configured[/green]"
+                if project.has_env
+                else "[yellow]✗ Not configured[/yellow]"
+            ),
         )
         table.add_row(
             "Docker",
-            "[green]✓ Configured[/green]" if project.has_docker else "[yellow]✗ Not configured[/yellow]"
+            (
+                "[green]✓ Configured[/green]"
+                if project.has_docker
+                else "[yellow]✗ Not configured[/yellow]"
+            ),
         )
 
         console.print(table)
@@ -135,13 +148,13 @@ class InitCommand:
         required_tools = []
 
         # Determine required tools
-        if project.package_manager in ['npm', 'yarn', 'pnpm']:
-            required_tools.extend(['node', 'npm'])
-        elif project.package_manager == 'pip':
-            required_tools.extend(['python3', 'pip'])
+        if project.package_manager in ["npm", "yarn", "pnpm"]:
+            required_tools.extend(["node", "npm"])
+        elif project.package_manager == "pip":
+            required_tools.extend(["python3", "pip"])
 
         if not project.has_git:
-            required_tools.append('git')
+            required_tools.append("git")
 
         # Validate
         all_valid, results = self.validator.validate(required_tools)
@@ -165,28 +178,28 @@ class InitCommand:
         if pm is None and (self.project_path / "package.json").exists():
             pm = "npm"
 
-        if pm == 'npm':
+        if pm == "npm":
             success = self.runner.run(
                 "npm install",
                 cwd=self.project_path,
                 description="Installing npm packages",
-                show_output=False
+                show_output=False,
             )
-        elif pm == 'yarn':
+        elif pm == "yarn":
             success = self.runner.run(
                 "yarn install",
                 cwd=self.project_path,
                 description="Installing yarn packages",
-                show_output=False
+                show_output=False,
             )
-        elif pm == 'pip':
+        elif pm == "pip":
             # Create venv first
             venv_path = self.project_path / "venv"
             if not venv_path.exists():
                 self.runner.run(
                     "python3 -m venv venv",
                     cwd=self.project_path,
-                    description="Creating virtual environment"
+                    description="Creating virtual environment",
                 )
 
             # Install requirements
@@ -194,27 +207,22 @@ class InitCommand:
                 "./venv/bin/pip install -r requirements.txt",
                 cwd=self.project_path,
                 description="Installing Python packages",
-                show_output=False
+                show_output=False,
             )
         else:
             console.print(
-                f"[yellow]⚠ Unknown package manager: {project.package_manager}[/yellow]")
+                f"[yellow]⚠ Unknown package manager: {project.package_manager}[/yellow]"
+            )
             success = False
 
         if success:
-            console.print(
-                "[green]✓ Dependencies installed successfully[/green]")
+            console.print("[green]✓ Dependencies installed successfully[/green]")
         else:
-            console.print(
-                "[yellow]⚠ Some dependencies failed to install[/yellow]")
+            console.print("[yellow]⚠ Some dependencies failed to install[/yellow]")
 
     def _setup_environment(self, project):
         """Interactive environment setup"""
-        env_gen = EnvGenerator(
-            self.project_path,
-            project.type,
-            project.name
-        )
+        env_gen = EnvGenerator(self.project_path, project.type, project.name)
 
         if env_gen.interactive_setup():
             env_gen.generate_files()
@@ -222,28 +230,22 @@ class InitCommand:
             summary = env_gen.get_summary()
             console.print(f"\n[green]✓ Environment configured[/green]")
             console.print(
-                f"[dim]  → {summary['total_vars']} variables configured[/dim]")
-            if summary['categories']:
+                f"[dim]  → {summary['total_vars']} variables configured[/dim]"
+            )
+            if summary["categories"]:
                 console.print(
-                    f"[dim]  → Services: {', '.join(summary['categories'])}[/dim]")
+                    f"[dim]  → Services: {', '.join(summary['categories'])}[/dim]"
+                )
 
     def _setup_docker(self, project):
         """Set up Docker configuration"""
-        docker_gen = DockerGenerator(
-            self.project_path,
-            project.type,
-            project.name
-        )
+        docker_gen = DockerGenerator(self.project_path, project.type, project.name)
 
         # Ask about docker-compose vs just Dockerfile
         try:
             setup_type = questionary.select(
                 "What would you like to set up?",
-                choices=[
-                    "Dockerfile only",
-                    "Docker Compose (recommended)",
-                    "Both"
-                ]
+                choices=["Dockerfile only", "Docker Compose (recommended)", "Both"],
             ).ask()
         except Exception:
             setup_type = None
@@ -254,13 +256,12 @@ class InitCommand:
 
         if setup_type in ["Dockerfile only", "Both"]:
             docker_gen.generate_dockerfile()
-            if project.type in ['react', 'vue']:
+            if project.type in ["react", "vue"]:
                 docker_gen.generate_nginx_config()
 
         if setup_type in ["Docker Compose (recommended)", "Both"]:
             with_db = questionary.confirm(
-                "Include database in docker-compose?",
-                default=False
+                "Include database in docker-compose?", default=False
             ).ask()
             docker_gen.generate_docker_compose(with_database=with_db)
 
@@ -280,8 +281,7 @@ class InitCommand:
             console.print("  [green]✓[/green] Git repository initialized")
 
         if (self.project_path / ".env.example").exists():
-            console.print(
-                "  [green]✓[/green] Environment configuration created")
+            console.print("  [green]✓[/green] Environment configuration created")
 
         if (self.project_path / "Dockerfile").exists():
             console.print("  [green]✓[/green] Docker configuration added")
@@ -293,21 +293,20 @@ class InitCommand:
 
         # Environment setup
         if (self.project_path / ".env.example").exists():
-            console.print(
-                f"\n  [bold cyan]{step}. Configure environment:[/bold cyan]")
+            console.print(f"\n  [bold cyan]{step}. Configure environment:[/bold cyan]")
             console.print("     cp .env.example .env")
             console.print("     # Edit .env with your actual values")
             step += 1
 
         # Start development
         console.print(f"\n  [bold cyan]{step}. Start development:[/bold cyan]")
-        if project.package_manager == 'npm':
+        if project.package_manager == "npm":
             console.print("     npm run dev")
-        elif project.package_manager == 'pip':
-            if project.type == 'django':
+        elif project.package_manager == "pip":
+            if project.type == "django":
                 console.print("     source venv/bin/activate")
                 console.print("     python manage.py runserver")
-            elif project.type == 'fastapi':
+            elif project.type == "fastapi":
                 console.print("     source venv/bin/activate")
                 console.print("     uvicorn main:app --reload")
         step += 1
@@ -320,13 +319,11 @@ class InitCommand:
                 console.print("     docker-compose up")
             else:
                 console.print("     docker build -t {} .".format(project.name))
-                console.print(
-                    "     docker run -p 8000:8000 {}".format(project.name))
+                console.print("     docker run -p 8000:8000 {}".format(project.name))
 
         # Resources
         console.print("\n[bold]📚 Resources:[/bold]")
         console.print("  [cyan]scaffold --help[/cyan]     Show all commands")
-        console.print(
-            "  [cyan]scaffold list[/cyan]      View available templates")
+        console.print("  [cyan]scaffold list[/cyan]      View available templates")
 
         console.print("\n[dim]Happy coding! 🎉[/dim]\n")

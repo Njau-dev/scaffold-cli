@@ -10,12 +10,17 @@ import questionary
 
 from .project_types import (
     ProjectConfig,
+    get_project_by_name,
     get_project_categories,
     get_projects_by_category,
 )
 from .installer import Installer
 from ..validators.dependencies import DependencyValidator
 from ..utils.git import GitManager
+from .quick_templates import get_template_choices, get_template_from_choice
+from ..generators.docker_generator import DockerGenerator
+from ..generators.env_generator import EnvGenerator
+
 
 console = Console()
 
@@ -61,31 +66,18 @@ class ProjectOrchestrator:
                 self.console.print("[yellow]Cancelled[/yellow]")
                 return False
 
-        # Ask about monorepo
-        if not monorepo:
-            monorepo = questionary.confirm(
-                "🗂️  Create as monorepo?", default=False
-            ).ask()
-
-            if monorepo is None:  # User pressed Ctrl+C
-                self.console.print("\n[yellow]Cancelled[/yellow]")
-                return False
-
-        if monorepo:
-            return self._create_monorepo(name)
-        else:
-            return self._create_single_project(name)
-
-    def _create_single_project(self, name: str) -> bool:
-        """Create a single project"""
-
-        self.console.print("\n[bold cyan]→ Single Project Setup[/bold cyan]")
-
-        # Step 1: Choose category with arrow keys
-        categories = get_project_categories()
-        category = questionary.select(
-            "📂 Select project type:",
-            choices=[cat.capitalize() for cat in categories],
+        # NEW: Ask for project type (includes Quick Templates and Monorepo)
+        project_type_choice = questionary.select(
+            "Select project type:",
+            choices=[
+                "Quick Templates (recommended presets)",
+                "Frontend",
+                "API",
+                "Framework",
+                "Monorepo",
+                "Mobile",
+                "CLI",
+            ],
             style=questionary.Style(
                 [
                     ("selected", "fg:cyan bold"),
@@ -95,11 +87,314 @@ class ProjectOrchestrator:
             ),
         ).ask()
 
-        if category is None:  # User pressed Ctrl+C
+        if project_type_choice is None:
             self.console.print("\n[yellow]Cancelled[/yellow]")
             return False
 
-        category = category.lower()
+        # Handle based on selection
+        if project_type_choice == "Quick Templates (recommended presets)":
+            return self._create_from_quick_template(name)
+        elif project_type_choice == "Monorepo":
+            return self._create_monorepo(name)
+        else:
+            # Map display name to category
+            category_map = {
+                "Frontend": "frontend",
+                "API": "api",
+                "Framework": "framework",
+                "Mobile": "mobile",
+                "CLI": "cli",
+            }
+            category = category_map.get(project_type_choice)
+            return self._create_single_project(name, category)
+
+    def _create_from_quick_template(self, name: str) -> bool:
+        """Create project from a quick template"""
+
+        self.console.print("\n[bold cyan]→ Quick Templates[/bold cyan]")
+        self.console.print("[dim]Pre-configured setups for common use cases[/dim]\n")
+
+        # Get template choices
+        choices = get_template_choices()
+
+        selected_choice = questionary.select(
+            "Select a template:",
+            choices=choices,
+            style=questionary.Style(
+                [
+                    ("selected", "fg:cyan bold"),
+                    ("pointer", "fg:cyan bold"),
+                    ("highlighted", "fg:cyan"),
+                ]
+            ),
+        ).ask()
+
+        if selected_choice is None:
+            self.console.print("\n[yellow]Cancelled[/yellow]")
+            return False
+
+        # Get template from choice
+        template = get_template_from_choice(selected_choice)
+
+        if template is None:
+            self.console.print("[red]✗ Invalid template selection[/red]")
+            return False
+
+        # Handle full-stack templates (monorepo)
+        if template.category == "fullstack":
+            return self._create_fullstack_from_template(name, template)
+
+        # Get project config
+        project_config = get_project_by_name(template.base_project)
+
+        if not project_config:
+            self.console.print(
+                f"[red]✗ Project type not found: {template.base_project}[/red]"
+            )
+            return False
+
+        # Validate dependencies
+        if not self.validator.validate_and_report(project_config.requires):
+            return False
+
+        # Install project
+        success = self.installer.install(project_config, name)
+
+        if not success:
+            return False
+
+        project_path = Path.cwd() / name
+
+        # Optional: Environment setup
+        if template.setup_env:
+            if questionary.confirm(
+                "\n🔧 Set up environment configuration?", default=True
+            ).ask():
+                self._setup_template_environment(
+                    project_path, name, project_config.language, template
+                )
+
+        # Optional: Docker setup
+        if template.setup_docker:
+            if questionary.confirm("\n🐳 Set up Docker?", default=True).ask():
+                self._setup_template_docker(project_path, project_config.language, name)
+
+        # Initialize git
+        self.git_manager.init_repository(
+            project_path, f"Initial commit - {template.name} project"
+        )
+
+        # Show success message
+        self._show_success_message(name, project_config)
+
+        return True
+
+    def _create_fullstack_from_template(self, name: str, template) -> bool:
+        """Create a full-stack project from template"""
+        self.console.print(f"\n[bold cyan]→ Creating {template.name}...[/bold cyan]")
+
+        # Map template to frontend/backend choices
+        stack_map = {
+            "mern-stack": ("react-vite-ts", "express-ts"),
+            "pern-stack": ("react-vite-ts", "express-ts"),
+            "nextjs-fastapi": ("nextjs", "fastapi"),
+        }
+
+        frontend_key, backend_key = stack_map.get(
+            template.key, ("react-vite-ts", "fastapi")
+        )
+
+        frontend_config = get_project_by_name(frontend_key)
+        backend_config = get_project_by_name(backend_key)
+
+        if not frontend_config or not backend_config:
+            self.console.print("[red]✗ Template configuration error[/red]")
+            return False
+
+        # Validate dependencies
+        all_deps = list(set(frontend_config.requires + backend_config.requires))
+        if not self.validator.validate_and_report(all_deps):
+            return False
+
+        # Create monorepo structure
+        self.console.print(f"\n[bold yellow]📦 Creating monorepo: {name}[/bold yellow]")
+
+        project_root = Path.cwd() / name
+        project_root.mkdir(parents=True, exist_ok=True)
+
+        # Install frontend
+        self.console.print("\n[cyan]→ Setting up frontend (web/)...[/cyan]")
+        frontend_success = self.installer.install(
+            frontend_config, "web", parent_dir=project_root, skip_post_install=True
+        )
+
+        if not frontend_success:
+            self.console.print("[red]✗ Frontend installation failed[/red]")
+            return False
+
+        # Install backend
+        self.console.print("\n[cyan]→ Setting up backend (api/)...[/cyan]")
+        backend_success = self.installer.install(
+            backend_config, "api", parent_dir=project_root, skip_post_install=True
+        )
+
+        if not backend_success:
+            self.console.print("[red]✗ Backend installation failed[/red]")
+            return False
+
+        # Environment setup
+        if questionary.confirm(
+            "\n🔧 Set up environment configuration?", default=True
+        ).ask():
+            self._setup_monorepo_environment(project_root, name, template)
+
+        # Docker setup
+        if questionary.confirm("\n🐳 Set up Docker?", default=True).ask():
+            self._setup_monorepo_docker(project_root, name, template)
+
+        # Create root README
+        self._create_monorepo_readme(project_root, frontend_config, backend_config)
+
+        # Initialize git
+        self.git_manager.init_repository(
+            project_root, f"Initial commit - {template.name}"
+        )
+
+        # Show success
+        self._show_monorepo_success(name, frontend_config, backend_config)
+
+        return True
+
+    def _setup_template_environment(
+        self, project_path: Path, name: str, language: str, template
+    ):
+        """Set up environment for a template"""
+
+        # Determine project type for env generator
+        type_map = {
+            "javascript": "react",
+            "typescript": "react",
+            "python": "fastapi",
+            "go": "express",
+            "rust": "express",
+        }
+        project_type = type_map.get(language, "react")
+
+        env_gen = EnvGenerator(project_path, project_type, name)
+
+        # Add base variables
+        env_gen._add_base_variables()
+
+        # Ask about recommended services for this template
+        if template.recommended_services:
+            self.console.print(
+                f"\n[bold]Recommended services for {template.name}:[/bold]"
+            )
+            if "database" in template.recommended_services:
+                if questionary.confirm("🗄️  Configure database?", default=True).ask():
+                    db_type = questionary.select(
+                        "Select database:",
+                        choices=["PostgreSQL", "MySQL", "MongoDB", "SQLite"],
+                    ).ask()
+                    if db_type:
+                        env_gen._add_service_vars(
+                            "database", db_type.lower().replace("sql", "")
+                        )
+
+        # Generate files
+        env_gen.generate_files()
+
+    def _setup_template_docker(self, project_path: Path, language: str, name: str):
+        """Set up Docker for a template"""
+
+        # Map language to project type
+        type_map = {
+            "javascript": "react",
+            "typescript": "nextjs",
+            "python": "fastapi",
+            "go": "go-gin",
+            "rust": "rust-axum",
+            "php": "laravel",
+            "ruby": "rails",
+        }
+        project_type = type_map.get(language, "react")
+
+        docker_gen = DockerGenerator(project_path, project_type, name)
+
+        # Generate Dockerfile
+        docker_gen.generate_dockerfile()
+
+        # Ask about docker-compose
+        with_db = questionary.confirm(
+            "Include database in docker-compose?", default=False
+        ).ask()
+
+        docker_gen.generate_docker_compose(with_database=with_db)
+
+    def _setup_monorepo_environment(self, project_root: Path, name: str, template):
+        """Set up environment for monorepo"""
+
+        # Frontend env
+        web_env = EnvGenerator(project_root / "web", "react", f"{name}-web")
+        web_env._add_base_variables()
+        web_env.generate_files()
+
+        # Backend env
+        api_env = EnvGenerator(project_root / "api", "fastapi", f"{name}-api")
+        api_env._add_base_variables()
+
+        # Configure services
+        if questionary.confirm("🗄️  Configure database?", default=True).ask():
+            db_type = questionary.select(
+                "Select database:", choices=["PostgreSQL", "MySQL", "MongoDB"]
+            ).ask()
+            if db_type:
+                api_env._add_service_vars(
+                    "database", db_type.lower().replace("sql", "")
+                )
+
+        api_env.generate_files()
+
+    def _setup_monorepo_docker(self, project_root: Path, name: str, template):
+        """Set up Docker for monorepo"""
+
+        # Frontend Dockerfile
+        web_docker = DockerGenerator(project_root / "web", "nextjs", f"{name}-web")
+        web_docker.generate_dockerfile()
+
+        # Backend Dockerfile
+        api_docker = DockerGenerator(project_root / "api", "fastapi", f"{name}-api")
+        api_docker.generate_dockerfile()
+
+        # Root docker-compose
+        root_docker = DockerGenerator(project_root, "monorepo", name)
+        root_docker.generate_docker_compose(with_database=True)
+
+    def _create_single_project(self, name: str, category: str = None) -> bool:
+        """Create a single project"""
+
+        self.console.print("\n[bold cyan]→ Single Project Setup[/bold cyan]")
+
+        if category is None:
+            # Step 1: Choose category with arrow keys
+            categories = get_project_categories()
+            category = questionary.select(
+                "📂 Select project type:",
+                choices=[cat.capitalize() for cat in categories],
+                style=questionary.Style(
+                    [
+                        ("selected", "fg:cyan bold"),
+                        ("pointer", "fg:cyan bold"),
+                        ("highlighted", "fg:cyan"),
+                    ]
+                ),
+            ).ask()
+
+            if category is None:  # User pressed Ctrl+C
+                self.console.print("\n[yellow]Cancelled[/yellow]")
+                return False
+
+            category = category.lower()
 
         # Step 2: Choose specific stack with arrow keys
         projects = get_projects_by_category(category)
@@ -251,7 +546,6 @@ class ProjectOrchestrator:
 
     def _show_success_message(self, name: str, config: ProjectConfig):
         """Display success message for single project"""
-        from rich.panel import Panel
 
         self.console.print("\n" + "=" * 70)
         self.console.print(
@@ -341,8 +635,7 @@ class ProjectOrchestrator:
         self.console.print(
             f"  [green]✓[/green] Repository initialized with first commit"
         )
-        self.console.print(
-            f"  [green]✓[/green] Default branch set to 'master'")
+        self.console.print(f"  [green]✓[/green] Default branch set to 'master'")
 
         self.console.print(
             f"\n  [bold cyan]To push to a remote repository:[/bold cyan]"

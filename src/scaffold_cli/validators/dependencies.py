@@ -58,7 +58,43 @@ class DependencyValidator:
             "install_hint": "https://git-scm.com/",
             "min_version": None,
             "description": "Git version control",
-        }
+        },
+        "php": {
+            "check": "php --version",
+            "install_hint": "https://php.net/",
+            "min_version": "8.1.0",
+            "description": "PHP runtime",
+        },
+        "go": {
+            "check": "go version",
+            "install_hint": "https://go.dev/doc/install",
+            "min_version": "1.20.0",
+            "description": "Go",
+        },
+        "cargo": {
+            "check": "cargo --version",
+            "install_hint": "https://rustup.rs/",
+            "min_version": None,
+            "description": "Rust/Cargo",
+        },
+        "ruby": {
+            "check": "ruby --version",
+            "install_hint": "https://ruby-lang.org/",
+            "min_version": "3.0.0",
+            "description": "Ruby",
+        },
+        "rails": {
+            "check": "rails --version",
+            "install_hint": "gem install rails",
+            "min_version": None,
+            "description": "Rails",
+        },
+        "flutter": {
+            "check": "flutter --version",
+            "install_hint": "https://docs.flutter.dev/",
+            "min_version": None,
+            "description": "Flutter",
+        },
     }
 
     def validate(self, required: List[str]) -> Tuple[bool, Dict[str, Dict]]:

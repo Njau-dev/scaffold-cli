@@ -1,6 +1,7 @@
 """
 Docker configuration generation
 """
+
 from pathlib import Path
 from typing import Optional
 from rich.console import Console
@@ -21,13 +22,14 @@ class DockerGenerator:
         try:
             dockerfile_path = self.project_path / "Dockerfile"
 
-            if self.project_type in ['react', 'nextjs', 'vue', 'nodejs']:
+            if self.project_type in ["react", "nextjs", "vue", "nodejs"]:
                 content = self._generate_node_dockerfile()
-            elif self.project_type in ['django', 'fastapi', 'flask', 'python']:
+            elif self.project_type in ["django", "fastapi", "flask", "python"]:
                 content = self._generate_python_dockerfile()
             else:
                 console.print(
-                    f"[yellow]⚠[/yellow] No Dockerfile template for {self.project_type}")
+                    f"[yellow]⚠[/yellow] No Dockerfile template for {self.project_type}"
+                )
                 return False
 
             dockerfile_path.write_text(content)
@@ -47,7 +49,7 @@ class DockerGenerator:
         try:
             compose_path = self.project_path / "docker-compose.yml"
 
-            if self.project_type == 'monorepo':
+            if self.project_type == "monorepo":
                 content = self._generate_monorepo_compose(with_database)
             else:
                 content = self._generate_single_compose(with_database)
@@ -58,14 +60,13 @@ class DockerGenerator:
             return True
 
         except Exception as e:
-            console.print(
-                f"[red]✗[/red] Failed to create docker-compose.yml: {e}")
+            console.print(f"[red]✗[/red] Failed to create docker-compose.yml: {e}")
             return False
 
     def _generate_node_dockerfile(self) -> str:
         """Generate Dockerfile for Node.js projects"""
-        if self.project_type == 'nextjs':
-            return f'''# Build stage
+        if self.project_type == "nextjs":
+            return f"""# Build stage
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -95,9 +96,9 @@ COPY --from=builder /app/.next/static ./.next/static
 EXPOSE 3000
 
 CMD ["node", "server.js"]
-'''
+"""
         else:  # React/Vue with Vite
-            return f'''# Build stage
+            return f"""# Build stage
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -124,12 +125,12 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
-'''
+"""
 
     def _generate_python_dockerfile(self) -> str:
         """Generate Dockerfile for Python projects"""
-        if self.project_type == 'django':
-            return f'''FROM python:3.12-slim
+        if self.project_type == "django":
+            return f"""FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -147,9 +148,9 @@ EXPOSE 8000
 
 # Run gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "{self.project_name}.wsgi:application"]
-'''
-        elif self.project_type == 'fastapi':
-            return '''FROM python:3.12-slim
+"""
+        elif self.project_type == "fastapi":
+            return """FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -164,9 +165,9 @@ EXPOSE 8000
 
 # Run uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-'''
+"""
         else:  # Generic Python
-            return '''FROM python:3.12-slim
+            return """FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -178,11 +179,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 CMD ["python", "main.py"]
-'''
+"""
 
     def _generate_dockerignore(self):
         """Generate .dockerignore file"""
-        content = '''# Dependencies
+        content = """# Dependencies
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -224,39 +225,39 @@ Thumbs.db
 # Tests
 coverage/
 .pytest_cache/
-'''
+"""
         dockerignore_path = self.project_path / ".dockerignore"
         dockerignore_path.write_text(content)
         console.print(f"[green]✓[/green] Created .dockerignore")
 
     def _generate_single_compose(self, with_database: bool) -> str:
         """Generate docker-compose.yml for single project"""
-        service_name = self.project_name.replace('-', '_')
+        service_name = self.project_name.replace("-", "_")
 
-        compose = f'''version: '3.8'
+        compose = f"""version: '3.8'
 
 services:
   {service_name}:
     build: .
-    ports:'''
+    ports:"""
 
-        if self.project_type in ['react', 'vue']:
+        if self.project_type in ["react", "vue"]:
             compose += '\n      - "80:80"'
-        elif self.project_type == 'nextjs':
+        elif self.project_type == "nextjs":
             compose += '\n      - "3000:3000"'
         else:  # Python/Node APIs
             compose += '\n      - "8000:8000"'
 
-        compose += f'''
+        compose += f"""
     env_file:
       - .env
     volumes:
       - .:/app
     restart: unless-stopped
-'''
+"""
 
         if with_database:
-            compose += '''
+            compose += """
   db:
     image: postgres:15-alpine
     environment:
@@ -271,13 +272,13 @@ services:
 
 volumes:
   pgdata:
-'''
+"""
 
         return compose
 
     def _generate_monorepo_compose(self, with_database: bool) -> str:
         """Generate docker-compose.yml for monorepo"""
-        compose = '''version: '3.8'
+        compose = """version: '3.8'
 
 services:
   web:
@@ -302,10 +303,10 @@ services:
     volumes:
       - ./api:/app
     restart: unless-stopped
-'''
+"""
 
         if with_database:
-            compose += '''    depends_on:
+            compose += """    depends_on:
       - db
 
   db:
@@ -322,16 +323,16 @@ services:
 
 volumes:
   pgdata:
-'''
+"""
 
         return compose
 
     def generate_nginx_config(self):
         """Generate nginx.conf for React/Vue projects"""
-        if self.project_type not in ['react', 'vue']:
+        if self.project_type not in ["react", "vue"]:
             return
 
-        nginx_config = '''server {
+        nginx_config = """server {
     listen 80;
     server_name localhost;
     root /usr/share/nginx/html;
@@ -351,7 +352,7 @@ volumes:
         add_header Cache-Control "public, immutable";
     }
 }
-'''
+"""
         nginx_path = self.project_path / "nginx.conf"
         nginx_path.write_text(nginx_config)
         console.print(f"[green]✓[/green] Created nginx.conf")

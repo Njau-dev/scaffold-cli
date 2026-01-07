@@ -1,6 +1,7 @@
 """
 Project type detection - analyzes existing projects
 """
+
 from pathlib import Path
 from typing import Optional, Dict, List
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ console = Console()
 @dataclass
 class DetectedProject:
     """Information about a detected project"""
+
     type: str  # 'react', 'nextjs', 'django', 'fastapi', 'express', 'unknown'
     name: str
     path: Path
@@ -66,7 +68,7 @@ class ProjectDetector:
             has_env=has_env,
             has_docker=has_docker,
             dependencies_installed=deps_installed,
-            frameworks=frameworks
+            frameworks=frameworks,
         )
 
     def _detect_type(self) -> str:
@@ -77,65 +79,68 @@ class ProjectDetector:
             try:
                 with open(package_json) as f:
                     data = json.load(f)
-                    deps = {**data.get('dependencies', {}),
-                            **data.get('devDependencies', {})}
+                    deps = {
+                        **data.get("dependencies", {}),
+                        **data.get("devDependencies", {}),
+                    }
 
                     # Check for specific frameworks
-                    if 'next' in deps:
-                        return 'nextjs'
-                    elif 'react' in deps or 'react-dom' in deps:
-                        return 'react'
-                    elif 'vue' in deps:
-                        return 'vue'
-                    elif 'express' in deps:
-                        return 'express'
+                    if "next" in deps:
+                        return "nextjs"
+                    elif "react" in deps or "react-dom" in deps:
+                        return "react"
+                    elif "vue" in deps:
+                        return "vue"
+                    elif "express" in deps:
+                        return "express"
                     else:
-                        return 'nodejs'
+                        return "nodejs"
             except:
-                return 'nodejs'
+                return "nodejs"
 
         # Check for Python projects
         if (self.project_path / "manage.py").exists():
-            return 'django'
+            return "django"
 
         if (self.project_path / "main.py").exists():
             # Check if it's FastAPI
             req_file = self.project_path / "requirements.txt"
             if req_file.exists():
                 content = req_file.read_text()
-                if 'fastapi' in content.lower():
-                    return 'fastapi'
-                elif 'flask' in content.lower():
-                    return 'flask'
-            return 'python'
+                if "fastapi" in content.lower():
+                    return "fastapi"
+                elif "flask" in content.lower():
+                    return "flask"
+            return "python"
 
         if (self.project_path / "requirements.txt").exists():
-            return 'python'
+            return "python"
 
         if (self.project_path / "pyproject.toml").exists():
-            return 'python'
+            return "python"
 
         # Check for monorepo
         web_dir = self.project_path / "web"
         api_dir = self.project_path / "api"
         if web_dir.exists() and api_dir.exists():
-            return 'monorepo'
+            return "monorepo"
 
-        return 'unknown'
+        return "unknown"
 
     def _detect_package_manager(self) -> Optional[str]:
         """Detect which package manager is used"""
         # lockfile checks (keep existing order)
         if (self.project_path / "package-lock.json").exists():
-            return 'npm'
+            return "npm"
         elif (self.project_path / "yarn.lock").exists():
-            return 'yarn'
+            return "yarn"
         elif (self.project_path / "pnpm-lock.yaml").exists():
-            return 'pnpm'
+            return "pnpm"
         # python checks (existing)
-        elif (self.project_path / "requirements.txt").exists() or \
-             (self.project_path / "pyproject.toml").exists():
-            return 'pip'
+        elif (self.project_path / "requirements.txt").exists() or (
+            self.project_path / "pyproject.toml"
+        ).exists():
+            return "pip"
 
         # Fallback: if package.json exists, default to npm (or detect packageManager field)
         package_json = self.project_path / "package.json"
@@ -150,7 +155,7 @@ class ProjectDetector:
                             return key
             except Exception:
                 pass
-            return 'npm'
+            return "npm"
 
         return None
 
@@ -164,18 +169,20 @@ class ProjectDetector:
             try:
                 with open(package_json) as f:
                     data = json.load(f)
-                    deps = {**data.get('dependencies', {}),
-                            **data.get('devDependencies', {})}
+                    deps = {
+                        **data.get("dependencies", {}),
+                        **data.get("devDependencies", {}),
+                    }
 
                     # Common frameworks
                     framework_map = {
-                        'react': 'React',
-                        'next': 'Next.js',
-                        'vue': 'Vue',
-                        'express': 'Express.js',
-                        'tailwindcss': 'Tailwind CSS',
-                        'typescript': 'TypeScript',
-                        'vite': 'Vite'
+                        "react": "React",
+                        "next": "Next.js",
+                        "vue": "Vue",
+                        "express": "Express.js",
+                        "tailwindcss": "Tailwind CSS",
+                        "typescript": "TypeScript",
+                        "vite": "Vite",
                     }
 
                     for key, name in framework_map.items():
@@ -188,12 +195,12 @@ class ProjectDetector:
         req_file = self.project_path / "requirements.txt"
         if req_file.exists():
             content = req_file.read_text().lower()
-            if 'django' in content:
-                frameworks.append('Django')
-            if 'fastapi' in content:
-                frameworks.append('FastAPI')
-            if 'flask' in content:
-                frameworks.append('Flask')
+            if "django" in content:
+                frameworks.append("Django")
+            if "fastapi" in content:
+                frameworks.append("FastAPI")
+            if "flask" in content:
+                frameworks.append("Flask")
 
         return frameworks
 
@@ -205,8 +212,9 @@ class ProjectDetector:
 
         # Check venv for Python
         if (self.project_path / "requirements.txt").exists():
-            return (self.project_path / "venv").exists() or \
-                   (self.project_path / ".venv").exists()
+            return (self.project_path / "venv").exists() or (
+                self.project_path / ".venv"
+            ).exists()
 
         return True  # Assume installed if we can't determine
 
